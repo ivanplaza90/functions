@@ -3,23 +3,25 @@ package com.ivan.functions.application;
 import com.ivan.functions.domain.Author;
 import com.ivan.functions.domain.Book;
 import com.ivan.functions.domain.BookDate;
-import com.ivan.functions.domain.BookMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.then;
-import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class BookServiceTest {
 
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("MM-dd-yyyy")
+            .withZone(ZoneId.systemDefault());
     @Mock
     private Book book;
 
@@ -31,9 +33,6 @@ class BookServiceTest {
 
     @Mock
     private Author author;
-
-    @Mock
-    private BookMapper bookMapper;
 
     private BookService bookService;
 
@@ -48,13 +47,12 @@ class BookServiceTest {
         given(book.getSummary()).willReturn("********abcd**********");
         given(book.getAuthor()).willReturn(author);
         given(author.getBio()).willReturn("*********abc*********");
-        given(bookMapper.toBookDate(book)).willReturn(bookDate);
 
         final var response = bookService.filter("abc", List.of(book));
 
-        assertThat(response)
+        assertThat(response.get().getBook())
             .as("It should filter a book by name")
-            .isNotEmpty();
+            .isEqualTo(book);
     }
 
     @Test
@@ -100,27 +98,58 @@ class BookServiceTest {
         given(book.getSummary()).willReturn("********abcd**********");
         given(book.getAuthor()).willReturn(author);
         given(author.getBio()).willReturn("*********abc*********");
-        given(book.getPublicationTimestamp()).willReturn("1");
+        given(book.getPublicationTimestamp()).willReturn("2");
 
         given(anotherBook.getTitle()).willReturn("*********abcd*********");
         given(anotherBook.getSummary()).willReturn("********abcd**********");
         given(anotherBook.getAuthor()).willReturn(author);
         given(author.getBio()).willReturn("*********abc*********");
-        given(anotherBook.getPublicationTimestamp()).willReturn("2");
-
-        given(bookMapper.toBookDate(book)).willReturn(bookDate);
+        given(anotherBook.getPublicationTimestamp()).willReturn("1");
 
         final var response = bookService.filter("abc", List.of(book, anotherBook));
 
-        assertThat(response.get())
+        assertThat(response.get().getBook())
             .as("It should filter a book by name")
-            .isEqualTo(bookDate);
+            .isEqualTo(anotherBook);
+    }
 
-        then(bookMapper).should(times(0)).toBookDate(anotherBook);
+    @Test
+    void it_should_filter_a_book_given_a_book_without_publication_date() {
+        given(book.getTitle()).willReturn("*********abcd*********");
+        given(book.getSummary()).willReturn("********abcd**********");
+        given(book.getAuthor()).willReturn(author);
+        given(author.getBio()).willReturn("**************abc*************");
+        given(book.getPublicationTimestamp()).willReturn("1");
+
+        given(anotherBook.getTitle()).willReturn("*********abcd*********");
+        given(anotherBook.getSummary()).willReturn("********abcd**********");
+        given(anotherBook.getAuthor()).willReturn(author);
+        given(author.getBio()).willReturn("***abc***");
+
+
+        final var response = bookService.filter("abc", List.of(book, anotherBook));
+
+        assertThat(response.get().getBook())
+                .as("It should filter a book withouy publication date")
+                .isEqualTo(book);
+    }
+
+    @Test
+    void it_should_map_date() {
+        given(book.getTitle()).willReturn("*********abcd*********");
+        given(book.getSummary()).willReturn("********abcd**********");
+        given(book.getAuthor()).willReturn(author);
+        given(author.getBio()).willReturn("*********abc*********");
+
+        final var response = bookService.filter("abc", List.of(book));
+
+        assertThat(response.get().getTimestamp())
+            .as("It should map date")
+            .isEqualTo(DATE_TIME_FORMATTER.format(Instant.now()));
     }
 
     @BeforeEach
     void setUp() {
-        bookService = new BookService(bookMapper);
+        bookService = new BookService();
     }
 }
